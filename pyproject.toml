@@ -1,0 +1,23 @@
+[project]
+name = "memlog"
+version = "0.0.2"
+description = "A lightweight and colorful Python memory allocation tracking tool built on top of tracemalloc."
+readme = "README.md"
+authors = [
+    { name = "fjkl", email = "fjklqq@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.3.1",
+    "datetime>=6.0",
+    "humanfriendly>=10.0",
+    "pydantic>=2.12.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/fjklqq/memlog"
+Repository = "https://github.com/fjklqq/memlog"
+
+[build-system]
+requires = ["uv_build>=0.8.18,<0.9.0"]
+build-backend = "uv_build"
