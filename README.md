@@ -11,6 +11,7 @@ A lightweight and colorful Python memory allocation tracking tool built on top o
 - **Environment-controlled activation**: Enable tracking only when needed using an environment variable.
 - **Synchronous & Asynchronous Support**: Works seamlessly with both standard and `async` functions.
 - **Flexible Usage**: Use as a decorator, context manager, or manual API.
+- **Filtering Capabilities**: Include or exclude specific file paths or modules using `filters` and `ignores`.
 - **Colorful Output**: Displays memory statistics and differences in a clean, readable table format.
 - **Comparison Modes**: Compare current memory against a baseline (first snapshot) or the start of a specific block.
 
@@ -96,17 +97,20 @@ s2.compare_to(s1).show(top_k=10)
 ### Core Functions
 
 - `memlog.start()`: Initializes `tracemalloc` and records the "First Snapshot".
-- `memlog.take_snapshot(title=None)`: Captures the current memory state.
+- `memlog.take_snapshot(title=None, top_k=None, filters=None, ignores=None)`: Captures the current memory state.
+    - `filters`: A set of strings to include in the traceback (e.g., `{"src/memlog"}`).
+    - `ignores`: A set of strings to exclude from the traceback.
 - `memlog.get_first_snapshot()`: Returns the very first snapshot taken when `memlog` was started.
-- `memlog.snapshot(mode='start', title=None, top_k=None)`: A decorator for functions.
+- `memlog.snapshot(mode='start', title=None, top_k=None, filters=None, ignores=None)`: A decorator for functions.
     - `mode='start'`: Compares the end state to the state just before the function started.
     - `mode='first'`: Compares the end state to the global "First Snapshot".
-- `memlog.snapshot_manager(mode='start', title=None, top_k=None)`: A context manager.
+- `memlog.snapshot_manager(mode='start', title=None, top_k=None, filters=None, ignores=None)`: A context manager.
 
 ### Snapshot Methods
 
-- `snapshot.compare_to(other_snapshot)`: Returns a comparison object between two snapshots.
-- `snapshot.statistics(key_type=KeyType.TRACEBACK)`: Returns statistics for the snapshot.
+- `snapshot.compare_to(other_snapshot, key_type=KeyType.TRACEBACK, cumulative=False)`: Returns a comparison object between two snapshots.
+- `snapshot.compare(key_type=KeyType.TRACEBACK, cumulative=False)`: Compares current snapshot to the global "First Snapshot".
+- `snapshot.statistics(key_type=KeyType.TRACEBACK, cumulative=False)`: Returns statistics for the snapshot.
 - `snapshot.dump(filename)`: Save snapshot to a file.
 - `snapshot.load(filename)`: Load snapshot from a file.
 

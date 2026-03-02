@@ -11,6 +11,7 @@
 - **环境变量控制激活**：仅在需要时通过环境变量启用追踪。
 - **同步与异步支持**：无缝支持标准函数和 `async` 函数。
 - **灵活的使用方式**：支持作为装饰器、上下文管理器或手动 API 使用。
+- **过滤能力**：可使用 `filters` 与 `ignores` 包含或排除特定文件路径或模块。
 - **彩色输出**：以整洁、易读的表格格式显示内存统计信息和差异。
 - **比较模式**：将当前内存与基准（首次快照）或特定代码块的开始状态进行比较。
 
@@ -96,17 +97,20 @@ s2.compare_to(s1).show(top_k=10)
 ### 核心函数
 
 - `memlog.start()`：初始化 `tracemalloc` 并记录“首次快照”。
-- `memlog.take_snapshot(title=None)`：捕获当前的内存状态。
+- `memlog.take_snapshot(title=None, top_k=None, filters=None, ignores=None)`：捕获当前的内存状态。
+    - `filters`：只包含满足这些子串匹配的追踪条目（如 `{"src/memlog"}`）。
+    - `ignores`：排除满足这些子串匹配的追踪条目。
 - `memlog.get_first_snapshot()`：返回在 `memlog` 启动时拍摄的第一个快照。
-- `memlog.snapshot(mode='start', title=None, top_k=None)`：用于函数的装饰器。
+- `memlog.snapshot(mode='start', title=None, top_k=None, filters=None, ignores=None)`：用于函数的装饰器。
     - `mode='start'`：将结束状态与函数开始前的状态进行比较。
     - `mode='first'`：将结束状态与全局“首次快照”进行比较。
-- `memlog.snapshot_manager(mode='start', title=None, top_k=None)`：上下文管理器。
+- `memlog.snapshot_manager(mode='start', title=None, top_k=None, filters=None, ignores=None)`：上下文管理器。
 
 ### 快照方法 (Snapshot Methods)
 
-- `snapshot.compare_to(other_snapshot)`：返回两个快照之间的比较对象。
-- `snapshot.statistics(key_type=KeyType.TRACEBACK)`：返回快照的统计信息。
+- `snapshot.compare_to(other_snapshot, key_type=KeyType.TRACEBACK, cumulative=False)`：返回两个快照之间的比较对象。
+- `snapshot.compare(key_type=KeyType.TRACEBACK, cumulative=False)`：将当前快照与全局“首次快照”进行比较。
+- `snapshot.statistics(key_type=KeyType.TRACEBACK, cumulative=False)`：返回快照的统计信息。
 - `snapshot.dump(filename)`：将快照保存到文件。
 - `snapshot.load(filename)`：从文件加载快照。
 
