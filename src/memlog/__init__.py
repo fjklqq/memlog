@@ -127,6 +127,8 @@ def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, top_k
     """
 
     def _decorator(func):
+        _title = title or f"Snapshot[{func.__qualname__}]"
+
         @functools.wraps(func)
         async def _async(*args, **kwargs):
             if _do_snapshot():
@@ -137,7 +139,7 @@ def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, top_k
                     start_snapshot = take_snapshot()
             res = await func(*args, **kwargs)
             if _do_snapshot():
-                take_snapshot(title=title, filters=filters, ignores=ignores, top_k=top_k).compare_to(
+                take_snapshot(title=_title, filters=filters, ignores=ignores, top_k=top_k).compare_to(
                     start_snapshot).show()
             return res
 
@@ -151,7 +153,7 @@ def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, top_k
                     start_snapshot = take_snapshot()
             res = func(*args, **kwargs)
             if _do_snapshot():
-                take_snapshot(title=title, filters=filters, ignores=ignores, top_k=top_k).compare_to(
+                take_snapshot(title=_title, filters=filters, ignores=ignores, top_k=top_k).compare_to(
                     start_snapshot).show()
             return res
 

@@ -2,11 +2,12 @@
 # Date: 2026/2/27
 # Desc:
 import datetime
+import logging
 import pickle
 import sys
 import tracemalloc
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Set, Union
+from typing import List, Optional, Set, Union
 
 from humanfriendly import format_size
 
@@ -141,8 +142,7 @@ class StatisticsMinx:
         if rows:
             _result_str += f"┃ {_sep.join(rows)} ┃\n"
         _result_str += f"┗━{self._table_border(length, sep='━┻━', color=color)}━┛\n"
-
-        print(_result_str)
+        logging.warning(_result_str, stacklevel=4)
 
 
 class Statistics(StatisticsMinx):
