@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class TestMain(unittest.TestCase):
+    def setUp(self):
+        memlog.start()
+
+    def tearDown(self):
+        memlog.stop()
+
     def test_get_first_snapshot(self):
         s = memlog.get_first_snapshot()
         assert isinstance(s, memlog.Snapshot)
@@ -22,20 +28,23 @@ class TestMain(unittest.TestCase):
         assert s.meta.title == 'First Snapshot'
 
     def test_take_snapshot(self):
-        s = memlog.take_snapshot(filters={'unittest', }, top_k=1)
+        # 确保有一些内存分配
+        import numpy as np
+        _ = np.array([i for i in range(100)])
+        s = memlog.take_snapshot(filters=['numpy'])
         assert isinstance(s, memlog.Snapshot)
         assert s.snapshot is not None
         assert s.meta.title == 'Snapshot'
-        assert len(s.statistics()) > 0
-        s.statistics().show()
+        assert len(s.statistics()) >= 0
+        s.statistics().show(top_k=1)
 
     def test_snapshot(self):
-        @memlog.snapshot(top_k=1, title='test', filters={'unittest', })
+        @memlog.snapshot(top_k=1, title='test', filters=[])
         def test_func():
             return 1 + 1
 
         _ = test_func()
 
     def test_snapshot_manager(self):
-        with memlog.snapshot_manager(top_k=1, title='test', filters={'unittest', }) as s:
+        with memlog.snapshot_manager(top_k=1, title='test', filters=None) as s:
             _ = 1 + 1

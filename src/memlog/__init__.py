@@ -6,22 +6,27 @@ import threading
 import tracemalloc
 from typing import Literal, Optional, Tuple, Set
 
-from .model import Snapshot, KeyType
-from .model import SnapshotMeta
+from .model import Snapshot, KeyType, SnapshotMeta, FiltersTypes
 
-_lock: threading.Lock = threading.Lock()
 _first_snapshot: Snapshot | None = None
 _current_snapshot: Snapshot | None = None
 _do_snapshot_flag: Optional[bool] = None
 
 
-def _do_snapshot() -> bool:
+def _do_snapshot(without_is_tracing: bool = True) -> bool:
     global _do_snapshot_flag
     if _do_snapshot_flag is None:
         _flag = os.environ.get('MEMLOG_ENABLE', None)
         if _flag is None:
             return False
         elif _flag == '1':
+            if not without_is_tracing:
+                if tracemalloc.is_tracing():
+                    _do_snapshot_flag = True
+                    return True
+                else:
+                    _do_snapshot_flag = False
+                    return False
             _do_snapshot_flag = True
             return True
         else:
@@ -29,6 +34,39 @@ def _do_snapshot() -> bool:
             return False
     else:
         return _do_snapshot_flag
+
+
+def get_first_snapshot() -> Optional[Snapshot]:
+    return _first_snapshot
+
+
+def _set_first_snapshot(snapshot: Snapshot) -> Optional[Snapshot]:
+    global _first_snapshot
+    if _first_snapshot is None:
+        _first_snapshot = snapshot
+    return snapshot
+
+
+def _clear_first_snapshot() -> None:
+    global _first_snapshot
+    _first_snapshot = None
+
+
+def _set_current_snapshot(snapshot: Snapshot) -> Optional[Snapshot]:
+    global _current_snapshot
+    if _current_snapshot is None:
+        _current_snapshot = snapshot
+    return snapshot
+
+
+def _clear_current_snapshot() -> None:
+    global _current_snapshot
+    _current_snapshot = None
+
+
+def get_current_snapshot() -> Optional[Snapshot]:
+    global _current_snapshot
+    return _current_snapshot
 
 
 def start() -> None:
@@ -42,88 +80,70 @@ def start() -> None:
     Raises:
         Exception: If the lock cannot be acquired or if another unexpected error occurs during execution.
     """
-    if _do_snapshot():
-        with _lock:
-            tracemalloc.start()
-            global _first_snapshot
-            if _first_snapshot is None:
-                _first_snapshot = Snapshot(tracemalloc.take_snapshot(), SnapshotMeta(title='First Snapshot'))
+    if _do_snapshot(without_is_tracing=False):
+        tracemalloc.start()
+        _set_first_snapshot(Snapshot(tracemalloc.take_snapshot(), SnapshotMeta(title='First Snapshot')))
 
 
-def get_first_snapshot() -> Optional[Snapshot]:
+def stop():
+    if _do_snapshot(without_is_tracing=False):
+        tracemalloc.stop()
+        _clear_first_snapshot()
+        _clear_current_snapshot()
+        tracemalloc.clear_traces()
+
+
+def clear():
+    if _do_snapshot(without_is_tracing=False):
+        tracemalloc.clear_traces()
+        _clear_first_snapshot()
+        _clear_current_snapshot()
+
+
+def take_snapshot(title: str = None, filters: FiltersTypes = None) -> Optional[Snapshot]:
     """
-    Retrieves the first snapshot in a thread-safe manner.
+    Takes a snapshot of the current state and stores it with optional metadata and filters.
 
-    This function ensures thread safety by utilizing a lock while retrieving
-    the first snapshot. The snapshot returned represents the initial recorded
-    state.
-
-    Returns:
-        Snapshot: The first snapshot instance.
-    """
-    with _lock:
-        return _first_snapshot
-
-
-def take_snapshot(title: str = None, top_k: Optional[int] = None,
-                  filters: Optional[Set[str]] = None, ignores: Optional[Set[str]] = None,
-                  ) -> Optional[Snapshot]:
-    """
-    Takes a memory snapshot using tracemalloc with optional filtering, ignoring, and metadata.
-
-    This function captures the current state of the memory allocations and returns it as a
-    Snapshot object. The snapshot metadata can be customized with a title, and the function
-    supports including or excluding specific memory allocations based on the provided filters
-    and ignore rules. The result can optionally include only the top `k` memory blocks.
+    This function creates a snapshot of the current memory usage using the `tracemalloc` module.
+    The snapshot can be associated with a title and filters for metadata purposes. If the snapshot
+    could not be taken, it returns None.
 
     Args:
-        title (str, optional): A descriptive title for the snapshot, used for metadata
-            purposes. Defaults to None.
-        top_k (Optional[int], optional): The number of top memory allocations to include
-            in the snapshot. If None, all memory blocks are included. Defaults to None.
-        filters (Optional[Set[str]], optional): A set of filters to include only specific
-            memory allocations based on their origin. Defaults to None.
-        ignores (Optional[Set[str]], optional): A set of patterns to ignore certain memory
-            allocations from being included in the snapshot. Defaults to None.
+        title (str, optional): A title or description for the snapshot.
+        filters (FiltersTypes, optional): Filters to be applied to the snapshot.
 
     Returns:
-        Optional[Snapshot]: Returns a `Snapshot` object containing the captured memory
-            state and associated metadata. If the snapshot process fails or is disabled,
-            None is returned.
+        Optional[Snapshot]: The created snapshot object if successful, otherwise None.
     """
     if not _do_snapshot():
         return None
-    with _lock:
-        global _current_snapshot
-        _current_snapshot = tracemalloc.take_snapshot()
-        return Snapshot(snapshot=_current_snapshot, meta=SnapshotMeta(title=title),
-                        filters=filters, ignores=ignores, top_k=top_k)
+
+    return _set_current_snapshot(
+        Snapshot(snapshot=tracemalloc.take_snapshot(),
+                 meta=SnapshotMeta(title=title), filters=filters)
+    )
 
 
-def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, top_k: Optional[int] = None,
-             filters: Optional[Set[str]] = None, ignores: Optional[Set[str]] = None):
+def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, filters: FiltersTypes = None,
+             top_k: Optional[int] = 10, key_type: KeyType = KeyType.TRACEBACK):
     """
-    Creates a decorator that captures snapshots of the current state and optionally
-    compares them after the decorated function executes. This is useful for tracking
-    state changes before and after the function call, with customizable options for
-    title, mode, and filters.
+    Decorator function to create and manage snapshots during function execution. A snapshot captures
+    certain aspects of the program state for analysis purposes. The decorator works with both synchronous
+    and asynchronous functions.
 
     Args:
-        mode (Literal['first', 'start']): The snapshot mode. If 'first', uses an initial
-            global snapshot as the reference point. If 'start', takes a new snapshot
-            when the function starts.
-        title (str, optional): A title to associate with the snapshots. Defaults to None.
-        top_k (Optional[int], optional): The number of top differences to display during
-            state comparison. Defaults to None (show all differences).
-        filters (Optional[Set[str]], optional): A set of filters to apply when creating
-            snapshots. Defaults to None (no filters applied).
-        ignores (Optional[Set[str]], optional): A set of fields to ignore during state
-            comparison. Defaults to None (compare all fields).
+        mode (Literal['first', 'start']): The mode of the snapshot. If 'start', it always takes a new
+            starting snapshot. If 'first', it uses the first snapshot taken during the process.
+        title (str): An optional title for the snapshot. Defaults to the function's qualified name.
+        filters (FiltersTypes): Filters to apply when taking the snapshot. Can be used to customize
+            captured data.
+        top_k (Optional[int]): The maximum number of top differences to display. Defaults to 10.
+        key_type (KeyType): The type of keys used for comparison between snapshots. Typically determines
+            the method of analyzing differences.
 
     Returns:
-        Callable: A decorator that wraps the given function, capturing snapshots based
-        on the provided parameters and comparing the state before and after the function
-        execution.
+        Callable: A decorator function that wraps the given function to handle snapshots.
+
     """
 
     def _decorator(func):
@@ -132,29 +152,25 @@ def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, top_k
         @functools.wraps(func)
         async def _async(*args, **kwargs):
             if _do_snapshot():
-                if mode == 'first':
-                    with _lock:
-                        start_snapshot = get_first_snapshot()
-                else:
-                    start_snapshot = take_snapshot()
+                start_snapshot = get_first_snapshot()
+                if mode == 'start' or start_snapshot is None:
+                    start_snapshot = _set_current_snapshot(take_snapshot(title=_title + '[START]'))
             res = await func(*args, **kwargs)
             if _do_snapshot():
-                take_snapshot(title=_title, filters=filters, ignores=ignores, top_k=top_k).compare_to(
-                    start_snapshot).show()
+                _set_current_snapshot(take_snapshot(_title, filters)).compare_to(start_snapshot, key_type).show(
+                    top_k=top_k)
             return res
 
         @functools.wraps(func)
         def _sync(*args, **kwargs):
             if _do_snapshot():
-                if mode == 'first':
-                    with _lock:
-                        start_snapshot = get_first_snapshot()
-                else:
-                    start_snapshot = take_snapshot()
+                start_snapshot = get_first_snapshot()
+                if mode == 'start' or start_snapshot is None:
+                    start_snapshot = _set_current_snapshot(take_snapshot(title=_title + '[START]'))
             res = func(*args, **kwargs)
             if _do_snapshot():
-                take_snapshot(title=_title, filters=filters, ignores=ignores, top_k=top_k).compare_to(
-                    start_snapshot).show()
+                _set_current_snapshot(take_snapshot(_title, filters)).compare_to(start_snapshot, key_type).show(
+                    top_k=top_k)
             return res
 
         # 判断函数是否为异步函数
@@ -167,35 +183,42 @@ def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, top_k
 
 
 @contextlib.contextmanager
-def snapshot_manager(mode: Literal['first', 'start'] = 'start', title: str = None, top_k: Optional[int] = None,
-                     filters: Optional[Set[str]] = None, ignores: Optional[Set[str]] = None):
+def snapshot_manager(mode: Literal['first', 'start'] = 'start', title: str = None, filters: FiltersTypes = None,
+                     top_k: Optional[int] = 10, key_type: KeyType = KeyType.TRACEBACK):
     """
-    Context manager to manage and compare system snapshots.
+    Manages memory snapshots within a context to identify and analyze memory usage patterns.
 
-    The function operates in one of two modes: 'first' or 'start'. In 'first' mode,
-    it locks and retrieves the first available snapshot, while in 'start' mode,
-    it captures a new snapshot at the beginning of the context. At the end of the
-    context, it captures another snapshot and compares it to the initial one.
-    The comparison result may optionally display the top differing items.
+    This context manager facilitates the creation and comparison of memory snapshots to help
+    detect memory-related issues. It captures an initial memory snapshot when entering the
+    context and compares it to a subsequent snapshot taken upon exiting the context. The
+    comparison identifies differences in memory allocation based on the specified filters
+    and settings.
 
     Args:
-        mode (Literal['first', 'start']): Determines the mode of snapshot operation.
-            Use 'first' to lock and retrieve the first snapshot. Use 'start' to
-            capture a new snapshot at the beginning.
-        title (str, optional): The title to associate with the final snapshot
-            taken at the end of the context.
-        top_k (int, optional): The number of top differing items to display
-            during the comparison.
+        mode (Literal['first', 'start']): Determines the behavior for selecting the starting
+            snapshot. 'start' forces the creation of a new snapshot on entry, while 'first'
+            uses the first available snapshot, if existing.
+        title (str, optional): A label for the captured snapshots, helpful for identification
+            in the reports.
+        filters (FiltersTypes, optional): Criteria to filter objects included in memory
+            snapshots, such as specifying which objects to include or exclude.
+        top_k (Optional[int]): Limits the number of differences or memory-hogging entries
+            displayed in the report to this number. Defaults to 10.
+        key_type (KeyType): Determines the basis for comparing snapshots, typically by
+            traceback identifiers.
+
+    Yields:
+        None: This context manager does not return any value but performs its operations
+            on entry and exit.
     """
+
     if _do_snapshot():
-        if mode == 'first':
-            with _lock:
-                start_snapshot = get_first_snapshot()
-        else:
-            start_snapshot = take_snapshot()
+        start_snapshot = get_first_snapshot()
+        if mode == 'start' or start_snapshot is None:
+            start_snapshot = _set_current_snapshot(take_snapshot(title=title))
     yield
     if _do_snapshot():
-        take_snapshot(title=title, filters=filters, ignores=ignores, top_k=top_k).compare_to(start_snapshot).show()
+        _set_current_snapshot(take_snapshot(title, filters)).compare_to(start_snapshot, key_type).show(top_k=top_k)
 
 
 if _do_snapshot():

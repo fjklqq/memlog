@@ -11,8 +11,8 @@ A lightweight and colorful Python memory allocation tracking tool built on top o
 - **Environment-controlled activation**: Enable tracking only when needed using an environment variable.
 - **Synchronous & Asynchronous Support**: Works seamlessly with both standard and `async` functions.
 - **Flexible Usage**: Use as a decorator, context manager, or manual API.
-- **Filtering Capabilities**: Include or exclude specific file paths or modules using `filters` and `ignores`.
-- **Colorful Output**: Displays memory statistics and differences in a clean, readable table format.
+- **Filtering Capabilities**: Include specific file paths or modules using `filters` (supports string list or `tracemalloc.Filter`).
+- **Colorful Output**: Displays memory statistics and differences in a clean, readable table format (automatically detects TTY for color).
 - **Comparison Modes**: Compare current memory against a baseline (first snapshot) or the start of a specific block.
 
 ## Installation
@@ -21,7 +21,7 @@ A lightweight and colorful Python memory allocation tracking tool built on top o
 pip install memlog
 ```
 
-*(Note: Ensure you have the required dependencies: `click`, `humanfriendly`, and `pydantic`.)*
+*(Note: Required dependencies: `click`, `datetime`, `humanfriendly`, and `pydantic`.)*
 
 ## Configuration
 
@@ -97,14 +97,13 @@ s2.compare_to(s1).show(top_k=10)
 ### Core Functions
 
 - `memlog.start()`: Initializes `tracemalloc` and records the "First Snapshot".
-- `memlog.take_snapshot(title=None, top_k=None, filters=None, ignores=None)`: Captures the current memory state.
-    - `filters`: A set of strings to include in the traceback (e.g., `{"src/memlog"}`).
-    - `ignores`: A set of strings to exclude from the traceback.
+- `memlog.take_snapshot(title=None, filters=None)`: Captures the current memory state.
+    - `filters`: A list of strings or `tracemalloc.Filter` objects to include in the traceback (e.g., `["src/memlog"]`).
 - `memlog.get_first_snapshot()`: Returns the very first snapshot taken when `memlog` was started.
-- `memlog.snapshot(mode='start', title=None, top_k=None, filters=None, ignores=None)`: A decorator for functions.
+- `memlog.snapshot(mode='start', title=None, filters=None, top_k=10, key_type=KeyType.TRACEBACK)`: A decorator for functions.
     - `mode='start'`: Compares the end state to the state just before the function started.
     - `mode='first'`: Compares the end state to the global "First Snapshot".
-- `memlog.snapshot_manager(mode='start', title=None, top_k=None, filters=None, ignores=None)`: A context manager.
+- `memlog.snapshot_manager(mode='start', title=None, filters=None, top_k=10, key_type=KeyType.TRACEBACK)`: A context manager.
 
 ### Snapshot Methods
 
@@ -116,8 +115,9 @@ s2.compare_to(s1).show(top_k=10)
 
 ### Statistics Methods
 
-- `statistics.show(top_k=None)`: Prints the formatted table to stdout.
+- `statistics.show(top_k=10)`: Prints the formatted statistics to stdout.
+- `statistics.show_table(top_k=10)`: Prints a formatted table to stdout.
 
 ## License
 
-(Specify your license here, e.g., MIT)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

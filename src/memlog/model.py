@@ -2,61 +2,24 @@
 # Date: 2026/2/27
 # Desc:
 import datetime
+import linecache
 import logging
 import pickle
 import sys
 import tracemalloc
 from dataclasses import dataclass
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Sequence, Union
+
 
 from humanfriendly import format_size
 
 from .colorful import (
     colorful_title, colorful_head,
-    colorful_traceback, colorful_size, colorful_count, colorful_size_diff
+    colorful_traceback, colorful_size, colorful_count, colorful_size_diff, colorful
 )
-from .enums import KeyType
+from .enums import KeyType, StyleColor
 
-
-class TracebackFilter:
-    def __init__(self, filters: Optional[Set[str]] = None, ignores: Optional[Set[str]] = None,
-                 top_k: Optional[int] = None) -> None:
-        self._filters = filters or set()
-        self._ignores = {'tracemalloc', 'memlog'}.union((ignores or set()))
-        self._top_k = top_k
-
-    @property
-    def top_k(self):
-        return self._top_k
-
-    @top_k.setter
-    def top_k(self, value: Optional[int] = None):
-        self._top_k = value
-
-    def __call__(self, traceback: tracemalloc.Traceback) -> bool:
-        for key in self._ignores:
-            if key in '\n'.join([t.filename for t in traceback]):
-                return False
-        if len(self._filters):
-            for key in self._filters:
-                if key in '\n'.join([t.filename for t in traceback]):
-                    return True
-            return False
-        else:
-            return True
-
-    def filter(self, statistic: List[Union[tracemalloc.Statistic, tracemalloc.StatisticDiff]],
-               top_k: Optional[int] = None
-               ) -> List[Union[tracemalloc.Statistic, tracemalloc.StatisticDiff]]:
-        result = []
-        _top_k = top_k or self._top_k
-        for s in statistic:
-            if self(s.traceback):
-                result.append(s)
-            if _top_k and len(result) >= _top_k:
-                break
-
-        return result
+FiltersTypes = Optional[Union[Sequence[Union[tracemalloc.DomainFilter, tracemalloc.Filter]], Sequence[str]]]
 
 
 @dataclass
@@ -117,9 +80,43 @@ class StatisticsMinx:
         statistics_info = [self._parser(statistic) for statistic in self._statistic]
         return repr(statistics_info)
 
-    def show(self):
+    def show(self, top_k: Optional[int] = 10, **kwargs) -> None:
         color = sys.stdout.isatty()
-        statistics_info = [self._parser(statistic) for statistic in self._statistic]
+        result = "\n"
+        if color:
+            title = colorful_title(self._meta.title_with_datetime)
+        else:
+            title = self._meta.title_with_datetime
+        result += f">>> {title}\n"
+        for statistic in self._statistic[:top_k]:
+            _row = self._parser(statistic)
+            _column = self._column
+            _sep = ': '
+            if color:
+                _row = self._colorful_row(_row)
+                _column = self._colorful_column()
+                _sep = colorful(_sep, bold=True)
+            result += '  '.join(
+                [f"{name}{_sep}{value}" for name, value in zip(_column[1:], _row[1:])]
+            ) + '\n'
+
+            for frame in statistic.traceback:
+                line = f'  File "{frame.filename}", line {frame.lineno}\n'
+                _code = linecache.getline(frame.filename, frame.lineno).strip()
+                if _code:
+                    if color:
+                        line = colorful(line, bold=True)
+                        line += f'    {colorful(_code, fg=StyleColor.RED)}\n'
+                    else:
+                        line += f'    {_code}\n'
+
+                result += line
+            result += '\n'
+        logging.warning(result, stacklevel=4)
+
+    def show_table(self, top_k: Optional[int] = 10, **kwargs) -> None:
+        color = sys.stdout.isatty()
+        statistics_info = [self._parser(statistic) for statistic in self._statistic[:top_k]]
         if color:
             statistics_info = list(map(self._colorful_row, statistics_info))
             columns = self._colorful_column()
@@ -205,12 +202,19 @@ class StatisticsDiff(StatisticsMinx):
 
 
 class Snapshot:
-    def __init__(self, snapshot: tracemalloc.Snapshot, meta: SnapshotMeta,
-                 filters: Optional[Set[str]] = None, ignores: Optional[Set[str]] = None,
-                 top_k: Optional[int] = None) -> None:
-        self._snapshot = snapshot
+    def __init__(self, snapshot: tracemalloc.Snapshot, meta: SnapshotMeta, filters: FiltersTypes = None) -> None:
         self._meta = meta
-        self._filters = TracebackFilter(filters=filters, ignores=ignores, top_k=top_k)
+        if filters:
+            _filters = []
+            for f in filters:
+                if isinstance(f, str):
+                    _filters.append(tracemalloc.Filter(True, f))
+                else:
+                    _filters.append(f)
+            self._snapshot = snapshot.filter_traces(_filters)
+
+        else:
+            self._snapshot = snapshot
 
     @property
     def meta(self) -> SnapshotMeta:
@@ -234,23 +238,20 @@ class Snapshot:
 
     def statistics(self, key_type: KeyType = KeyType.TRACEBACK, cumulative=False) -> Statistics:
         return Statistics(
-            statistics=self._filters.filter(self._snapshot.statistics(key_type.value, cumulative=cumulative)),
+            statistics=self._snapshot.statistics(key_type.value, cumulative=cumulative),
             meta=self._meta
         )
 
     def compare(self, key_type: KeyType = KeyType.TRACEBACK, cumulative=False) -> StatisticsDiff:
         from memlog import get_first_snapshot
+
         return StatisticsDiff(
-            statistics=self._filters.filter(
-                self._snapshot.compare_to(get_first_snapshot().snapshot, key_type.value, cumulative=cumulative)
-            ),
+            statistics=self._snapshot.compare_to(get_first_snapshot().snapshot, key_type.value, cumulative=cumulative),
             meta=self._meta
         )
 
     def compare_to(self, other: 'Snapshot', key_type: KeyType = KeyType.TRACEBACK, cumulative=False) -> StatisticsDiff:
         return StatisticsDiff(
-            statistics=self._filters.filter(
-                self._snapshot.compare_to(other.snapshot, key_type.value, cumulative=cumulative)
-            ),
+            statistics=self._snapshot.compare_to(other.snapshot, key_type.value, cumulative=cumulative),
             meta=self._meta,
         )

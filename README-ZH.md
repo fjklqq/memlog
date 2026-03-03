@@ -11,8 +11,8 @@
 - **环境变量控制激活**：仅在需要时通过环境变量启用追踪。
 - **同步与异步支持**：无缝支持标准函数和 `async` 函数。
 - **灵活的使用方式**：支持作为装饰器、上下文管理器或手动 API 使用。
-- **过滤能力**：可使用 `filters` 与 `ignores` 包含或排除特定文件路径或模块。
-- **彩色输出**：以整洁、易读的表格格式显示内存统计信息和差异。
+- **过滤能力**：使用 `filters` 包含特定文件路径或模块（支持字符串列表或 `tracemalloc.Filter`）。
+- **彩色输出**：以整洁、易读的表格格式显示内存统计信息和差异（自动检测 TTY 以启用彩色输出）。
 - **比较模式**：将当前内存与基准（首次快照）或特定代码块的开始状态进行比较。
 
 ## 安装
@@ -21,7 +21,7 @@
 pip install memlog
 ```
 
-*(注意：请确保已安装所需的依赖项：`click`、`humanfriendly` 和 `pydantic`。)*
+*(注意：所需依赖项：`click`、`datetime`、`humanfriendly` 和 `pydantic`。)*
 
 ## 配置
 
@@ -97,14 +97,13 @@ s2.compare_to(s1).show(top_k=10)
 ### 核心函数
 
 - `memlog.start()`：初始化 `tracemalloc` 并记录“首次快照”。
-- `memlog.take_snapshot(title=None, top_k=None, filters=None, ignores=None)`：捕获当前的内存状态。
-    - `filters`：只包含满足这些子串匹配的追踪条目（如 `{"src/memlog"}`）。
-    - `ignores`：排除满足这些子串匹配的追踪条目。
+- `memlog.take_snapshot(title=None, filters=None)`：捕获当前的内存状态。
+    - `filters`：要在追踪中包含的字符串列表或 `tracemalloc.Filter` 对象（例如 `["src/memlog"]`）。
 - `memlog.get_first_snapshot()`：返回在 `memlog` 启动时拍摄的第一个快照。
-- `memlog.snapshot(mode='start', title=None, top_k=None, filters=None, ignores=None)`：用于函数的装饰器。
+- `memlog.snapshot(mode='start', title=None, filters=None, top_k=10, key_type=KeyType.TRACEBACK)`：用于函数的装饰器。
     - `mode='start'`：将结束状态与函数开始前的状态进行比较。
     - `mode='first'`：将结束状态与全局“首次快照”进行比较。
-- `memlog.snapshot_manager(mode='start', title=None, top_k=None, filters=None, ignores=None)`：上下文管理器。
+- `memlog.snapshot_manager(mode='start', title=None, filters=None, top_k=10, key_type=KeyType.TRACEBACK)`：上下文管理器。
 
 ### 快照方法 (Snapshot Methods)
 
@@ -116,8 +115,9 @@ s2.compare_to(s1).show(top_k=10)
 
 ### 统计方法 (Statistics Methods)
 
-- `statistics.show(top_k=None)`：将格式化后的表格打印到标准输出。
+- `statistics.show(top_k=10)`：将格式化后的统计信息打印到标准输出。
+- `statistics.show_table(top_k=10)`：将格式化后的表格打印到标准输出。
 
 ## 许可证
 
-(在此处指定您的许可证，例如 MIT)
+本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
