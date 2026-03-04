@@ -10,7 +10,6 @@ import tracemalloc
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Union
 
-
 from humanfriendly import format_size
 
 from .colorful import (
@@ -20,6 +19,8 @@ from .colorful import (
 from .enums import KeyType, StyleColor
 
 FiltersTypes = Optional[Union[Sequence[Union[tracemalloc.DomainFilter, tracemalloc.Filter]], Sequence[str]]]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -112,7 +113,7 @@ class StatisticsMinx:
 
                 result += line
             result += '\n'
-        logging.warning(result, stacklevel=4)
+        logger.warning(result, stacklevel=4)
 
     def show_table(self, top_k: Optional[int] = 10, **kwargs) -> None:
         color = sys.stdout.isatty()
@@ -139,7 +140,7 @@ class StatisticsMinx:
         if rows:
             _result_str += f"┃ {_sep.join(rows)} ┃\n"
         _result_str += f"┗━{self._table_border(length, sep='━┻━', color=color)}━┛\n"
-        logging.warning(_result_str, stacklevel=4)
+        logger.warning(_result_str, stacklevel=4)
 
 
 class Statistics(StatisticsMinx):

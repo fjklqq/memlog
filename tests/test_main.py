@@ -8,11 +8,6 @@ import unittest
 
 import memlog
 
-import logging
-
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s "%(pathname)s:%(lineno)s" - %(message)s')
-logger = logging.getLogger(__name__)
-
 
 class TestMain(unittest.TestCase):
     def setUp(self):
