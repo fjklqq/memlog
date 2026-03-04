@@ -92,7 +92,8 @@ def clear():
         _clear_current_snapshot()
 
 
-def take_snapshot(title: str = None, filters: FiltersTypes = None) -> Optional[Snapshot]:
+def take_snapshot(title: str = None, filters: FiltersTypes = None,
+                  auto_show_compare_top_k: int = 0) -> Optional[Snapshot]:
     """
     Takes a snapshot of the current state and stores it with optional metadata and filters.
 
@@ -103,6 +104,7 @@ def take_snapshot(title: str = None, filters: FiltersTypes = None) -> Optional[S
     Args:
         title (str, optional): A title or description for the snapshot.
         filters (FiltersTypes, optional): Filters to be applied to the snapshot.
+        auto_show_compare_top_k (int, optional): Number of top memory-consuming objects to show in comparison. Defaults to 0.
 
     Returns:
         Optional[Snapshot]: The created snapshot object if successful, otherwise None.
@@ -111,10 +113,13 @@ def take_snapshot(title: str = None, filters: FiltersTypes = None) -> Optional[S
         return None
     if not tracemalloc.is_tracing():
         return None
-    return _set_current_snapshot(
+    snapshot = _set_current_snapshot(
         Snapshot(snapshot=tracemalloc.take_snapshot(),
                  meta=SnapshotMeta(title=title), filters=filters)
     )
+    if auto_show_compare_top_k > 0 and snapshot and get_first_snapshot():
+        snapshot.compare_to(get_first_snapshot()).show(auto_show_compare_top_k)
+    return snapshot
 
 
 def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, filters: FiltersTypes = None,

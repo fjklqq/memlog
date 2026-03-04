@@ -1,6 +1,6 @@
 [project]
 name = "memlog"
-version = "0.0.7"
+version = "0.0.8"
 description = "A lightweight and colorful Python memory allocation tracking tool built on top of tracemalloc."
 readme = "README.md"
 license = { text = "MIT" }

@@ -4,7 +4,7 @@
 
 `memlog` 帮助您监控内存使用情况、识别潜在的内存泄漏，并在函数执行期间或特定上下文中比较内存快照。它在终端中提供清晰、格式化的表格输出。
 
-[English](./README.md) | [中文](./README-ZH.md)
+[English](https://github.com/fjklqq/memlog/blob/main/README.md) | [中文](./README-ZH.md)
 
 ## 特性
 

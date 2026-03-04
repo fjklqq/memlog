@@ -4,7 +4,7 @@ A lightweight and colorful Python memory allocation tracking tool built on top o
 
 `memlog` helps you monitor memory usage, identify potential memory leaks, and compare memory snapshots during function execution or within a specific context. It provides clear, formatted table output in your terminal.
 
-[English](./README.md) | [中文](./README-ZH.md)
+[English](https://github.com/fjklqq/memlog/blob/main/README.md) | [中文](./README-ZH.md)
 
 ## Features
 
