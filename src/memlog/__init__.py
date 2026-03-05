@@ -9,23 +9,6 @@ from .model import Snapshot, KeyType, SnapshotMeta, FiltersTypes
 
 _first_snapshot: Snapshot | None = None
 _current_snapshot: Snapshot | None = None
-_do_snapshot_flag: Optional[bool] = None
-
-
-def _do_snapshot() -> bool:
-    global _do_snapshot_flag
-    if _do_snapshot_flag is None:
-        _flag = os.environ.get('MEMLOG_ENABLE', None)
-        if _flag is None:
-            return False
-        elif _flag == '1':
-            _do_snapshot_flag = True
-            return True
-        else:
-            _do_snapshot_flag = False
-            return False
-    else:
-        return _do_snapshot_flag
 
 
 def get_first_snapshot() -> Optional[Snapshot]:
@@ -72,28 +55,25 @@ def start() -> None:
     Raises:
         Exception: If the lock cannot be acquired or if another unexpected error occurs during execution.
     """
-    if _do_snapshot():
-        tracemalloc.start()
-        _set_first_snapshot(Snapshot(tracemalloc.take_snapshot(), SnapshotMeta(title='First Snapshot')))
+    tracemalloc.start()
+    _set_first_snapshot(Snapshot(tracemalloc.take_snapshot(), SnapshotMeta(title='First Snapshot')))
 
 
 def stop():
-    if _do_snapshot():
-        tracemalloc.stop()
-        _clear_first_snapshot()
-        _clear_current_snapshot()
-        tracemalloc.clear_traces()
+    tracemalloc.stop()
+    _clear_first_snapshot()
+    _clear_current_snapshot()
+    tracemalloc.clear_traces()
 
 
 def clear():
-    if _do_snapshot():
-        tracemalloc.clear_traces()
-        _clear_first_snapshot()
-        _clear_current_snapshot()
+    tracemalloc.clear_traces()
+    _clear_first_snapshot()
+    _clear_current_snapshot()
 
 
 def take_snapshot(title: str = None, filters: FiltersTypes = None,
-                  auto_show_compare_top_k: int = 0) -> Optional[Snapshot]:
+                  auto_show_compare_top_k: int = 0) -> Snapshot:
     """
     Takes a snapshot of the current state and stores it with optional metadata and filters.
 
@@ -109,10 +89,6 @@ def take_snapshot(title: str = None, filters: FiltersTypes = None,
     Returns:
         Optional[Snapshot]: The created snapshot object if successful, otherwise None.
     """
-    if not _do_snapshot():
-        return None
-    if not tracemalloc.is_tracing():
-        return None
     snapshot = _set_current_snapshot(
         Snapshot(snapshot=tracemalloc.take_snapshot(),
                  meta=SnapshotMeta(title=title), filters=filters)
@@ -149,30 +125,24 @@ def snapshot(mode: Literal['first', 'start'] = 'start', title: str = None, filte
 
         @functools.wraps(func)
         async def _async(*args, **kwargs):
-            if _do_snapshot():
-                _start = get_first_snapshot()
-                if mode == 'start' or _start is None:
-                    _start = _set_current_snapshot(take_snapshot(title=_title + '[START]'))
-                res = await func(*args, **kwargs)
-                _end = _set_current_snapshot(take_snapshot(_title, filters))
-                if _end:
-                    _end.compare_to(_start, key_type).show(top_k=top_k)
-            else:
-                res = await func(*args, **kwargs)
+            _start = get_first_snapshot()
+            if mode == 'start' or _start is None:
+                _start = _set_current_snapshot(take_snapshot(title=_title + '[START]'))
+            res = await func(*args, **kwargs)
+            _end = _set_current_snapshot(take_snapshot(_title, filters))
+            if _end:
+                _end.compare_to(_start, key_type).show(top_k=top_k)
             return res
 
         @functools.wraps(func)
         def _sync(*args, **kwargs):
-            if _do_snapshot():
-                _start = get_first_snapshot()
-                if mode == 'start' or _start is None:
-                    _start = _set_current_snapshot(take_snapshot(title=_title + '[START]'))
-                res = func(*args, **kwargs)
-                _end = _set_current_snapshot(take_snapshot(_title, filters))
-                if _end:
-                    _end.compare_to(_start, key_type).show(top_k=top_k)
-            else:
-                res = func(*args, **kwargs)
+            _start = get_first_snapshot()
+            if mode == 'start' or _start is None:
+                _start = _set_current_snapshot(take_snapshot(title=_title + '[START]'))
+            res = func(*args, **kwargs)
+            _end = _set_current_snapshot(take_snapshot(_title, filters))
+            if _end:
+                _end.compare_to(_start, key_type).show(top_k=top_k)
             return res
 
         # 判断函数是否为异步函数
@@ -214,17 +184,10 @@ def snapshot_manager(mode: Literal['first', 'start'] = 'start', title: str = Non
             on entry and exit.
     """
 
-    if _do_snapshot():
-        _start = get_first_snapshot()
-        if mode == 'start' or _start is None:
-            _start = _set_current_snapshot(take_snapshot(title=title))
-        yield
-        _end = _set_current_snapshot(take_snapshot(title, filters))
-        if _end:
-            _end.compare_to(_start, key_type).show(top_k=top_k)
-    else:
-        yield
-
-
-if _do_snapshot():
-    start()
+    _start = get_first_snapshot()
+    if mode == 'start' or _start is None:
+        _start = _set_current_snapshot(take_snapshot(title=title))
+    yield
+    _end = _set_current_snapshot(take_snapshot(title, filters))
+    if _end:
+        _end.compare_to(_start, key_type).show(top_k=top_k)

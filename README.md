@@ -4,10 +4,11 @@ A lightweight and colorful Python memory allocation tracking tool built on top o
 
 `memlog` helps you monitor memory usage, identify potential memory leaks, and compare memory snapshots during function execution or within a specific context. It provides clear, formatted table output in your terminal.
 
-[English](https://github.com/fjklqq/memlog/blob/main/README.md) | [中文](./README-ZH.md)
+[English](https://github.com/fjklqq/memlog/blob/main/README.md) | [中文](https://github.com/fjklqq/memlog/blob/main/README-ZH.md)
 
 ## Features
 
+- **Stop/Clear Support**: Support for stopping and clearing traces.
 - **Environment-controlled activation**: Enable tracking only when needed using an environment variable.
 - **Synchronous & Asynchronous Support**: Works seamlessly with both standard and `async` functions.
 - **Flexible Usage**: Use as a decorator, context manager, or manual API.
@@ -21,18 +22,6 @@ A lightweight and colorful Python memory allocation tracking tool built on top o
 pip install memlog
 ```
 
-*(Note: Required dependencies: `click`, `datetime`, `humanfriendly`, and `pydantic`.)*
-
-## Configuration
-
-`memlog` is disabled by default to minimize overhead. To enable memory tracking, set the `MEMLOG_ENABLE` environment variable to `1`.
-
-```bash
-export MEMLOG_ENABLE=1
-```
-
-If `MEMLOG_ENABLE` is not set or set to any other value, `memlog` functions will perform no-op operations.
-
 ## Usage
 
 ### 1. Using as a Decorator
@@ -41,6 +30,9 @@ Easily track memory usage of a specific function.
 
 ```python
 import memlog
+
+# Start tracking
+memlog.start()
 
 @memlog.snapshot(title="Data Processing", top_k=5)
 def process_data():
@@ -66,6 +58,9 @@ Track memory within a specific block of code.
 
 ```python
 import memlog
+
+# Start tracking
+memlog.start()
 
 with memlog.snapshot_manager(title="Block Comparison", top_k=3):
     temp_list = [str(i) for i in range(50000)]
@@ -97,6 +92,8 @@ s2.compare_to(s1).show(top_k=10)
 ### Core Functions
 
 - `memlog.start()`: Initializes `tracemalloc` and records the "First Snapshot".
+- `memlog.stop()`: Stops `tracemalloc` and clears snapshots.
+- `memlog.clear()`: Clears `tracemalloc` traces and snapshots.
 - `memlog.take_snapshot(title=None, filters=None)`: Captures the current memory state.
     - `filters`: A list of strings or `tracemalloc.Filter` objects to include in the traceback (e.g., `["src/memlog"]`).
 - `memlog.get_first_snapshot()`: Returns the very first snapshot taken when `memlog` was started.

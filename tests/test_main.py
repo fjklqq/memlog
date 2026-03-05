@@ -34,7 +34,7 @@ class TestMain(unittest.TestCase):
         s.statistics().show(top_k=1)
 
     def test_snapshot(self):
-        @memlog.snapshot(top_k=1, title='test', filters=[])
+        @memlog.snapshot(top_k=10, title='test', filters=[])
         def test_func():
             return 1 + 1
 

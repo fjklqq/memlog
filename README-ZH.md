@@ -4,10 +4,11 @@
 
 `memlog` 帮助您监控内存使用情况、识别潜在的内存泄漏，并在函数执行期间或特定上下文中比较内存快照。它在终端中提供清晰、格式化的表格输出。
 
-[English](https://github.com/fjklqq/memlog/blob/main/README.md) | [中文](./README-ZH.md)
+[English](https://github.com/fjklqq/memlog/blob/main/README.md) | [中文](https://github.com/fjklqq/memlog/blob/main/README-ZH.md)
 
 ## 特性
 
+- **停止与清理支持**：支持停止追踪和清理追踪数据。
 - **环境变量控制激活**：仅在需要时通过环境变量启用追踪。
 - **同步与异步支持**：无缝支持标准函数和 `async` 函数。
 - **灵活的使用方式**：支持作为装饰器、上下文管理器或手动 API 使用。
@@ -21,18 +22,6 @@
 pip install memlog
 ```
 
-*(注意：所需依赖项：`click`、`datetime`、`humanfriendly` 和 `pydantic`。)*
-
-## 配置
-
-`memlog` 默认禁用以最小化开销。要启用内存追踪，请将 `MEMLOG_ENABLE` 环境变量设置为 `1`。
-
-```bash
-export MEMLOG_ENABLE=1
-```
-
-如果未设置 `MEMLOG_ENABLE` 或将其设置为其他任何值，`memlog` 函数将执行空操作（no-op）。
-
 ## 使用方法
 
 ### 1. 作为装饰器使用
@@ -41,6 +30,9 @@ export MEMLOG_ENABLE=1
 
 ```python
 import memlog
+
+# 开始追踪
+memlog.start()
 
 @memlog.snapshot(title="数据处理", top_k=5)
 def process_data():
@@ -66,6 +58,9 @@ async def run_task():
 
 ```python
 import memlog
+
+# 开始追踪
+memlog.start()
 
 with memlog.snapshot_manager(title="代码块比较", top_k=3):
     temp_list = [str(i) for i in range(50000)]
@@ -97,6 +92,8 @@ s2.compare_to(s1).show(top_k=10)
 ### 核心函数
 
 - `memlog.start()`：初始化 `tracemalloc` 并记录“首次快照”。
+- `memlog.stop()`：停止 `tracemalloc` 并清除快照。
+- `memlog.clear()`：清除 `tracemalloc` 追踪和快照。
 - `memlog.take_snapshot(title=None, filters=None)`：捕获当前的内存状态。
     - `filters`：要在追踪中包含的字符串列表或 `tracemalloc.Filter` 对象（例如 `["src/memlog"]`）。
 - `memlog.get_first_snapshot()`：返回在 `memlog` 启动时拍摄的第一个快照。

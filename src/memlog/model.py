@@ -199,7 +199,10 @@ class StatisticsDiff(StatisticsMinx):
 
     @staticmethod
     def _parser(statistic: tracemalloc.StatisticDiff):
-        return statistic.traceback, format_size(statistic.size), statistic.count, format_size(statistic.size_diff)
+        def _format_size_diff(value):
+            return format_size(value) if value < 0 else f"+{format_size(value)}"
+
+        return statistic.traceback, format_size(statistic.size), statistic.count, _format_size_diff(statistic.size_diff)
 
 
 class Snapshot:
